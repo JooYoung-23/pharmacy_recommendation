@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Service
@@ -26,6 +27,9 @@ public class DirectionService {
 
   private final PharmacySearchService pharmacySearchService;
   private final DirectionRepository directionRepository;
+  private final Base62Service base62Service;
+
+  private static final String DIRECTION_BASE_URL = "https://map.kakao.com/link/map/";
 
   @Transactional
   public List<Direction> saveAll(List<Direction> directionList) {
@@ -35,6 +39,19 @@ public class DirectionService {
     return directionRepository.saveAll(directionList);
   }
 
+  public String findDirectionUrlById(String encodedId) {
+    Long decodedId = base62Service.decodeDirectionId(encodedId);
+    Direction findDirection = directionRepository.findById(decodedId).orElse(null);
+
+    String directionUrlParams = String.join(",", findDirection.getTargetPharmacyName(),
+        String.valueOf(findDirection.getTargetLatitude()),
+        String.valueOf(findDirection.getTargetLongitude()));
+    String directionUrl = UriComponentsBuilder.fromHttpUrl(DIRECTION_BASE_URL + directionUrlParams)
+        .toUriString();
+
+    return directionUrl;
+  }
+
   public List<Direction> buildDirectionList(DocumentDto documentDto) {
 
     if (Objects.isNull(documentDto)) {
@@ -42,7 +59,6 @@ public class DirectionService {
     }
     // 약국 데이터 조회
     List<PharmacyDto> pharmacyDtoList = pharmacySearchService.searchPharmacyDtoList();
-
     // 거리 계산 알고리즘 적용
     return pharmacyDtoList
         .stream()
